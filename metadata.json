@@ -1,0 +1,5 @@
+{
+  "name": "Epica Camonica Dashboard",
+  "description": "Una dashboard professionale per la gestione di costi, ricavi e partecipanti dell'evento ciclistico Epica Camonica, con integrazione dei dati ENDU e flussi di cassa interni.",
+  "requestFramePermissions": []
+}

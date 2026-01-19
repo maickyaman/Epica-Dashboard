@@ -1,0 +1,2 @@
+
+export const STAFF_MEMBERS = ['BEPPE', 'DANIELE', 'GABRI', 'JURI', 'MAICKOL', 'MATTEO', 'ENDU'];
