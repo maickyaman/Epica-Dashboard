@@ -1,6 +1,6 @@
 import { NavLink, useLocation } from 'react-router';
 import {
-  LayoutDashboard, Receipt, Users, Layers, LogOut, Cloud, CloudOff, TrendingUp
+  LayoutDashboard, Receipt, Users, Layers, LogOut, TrendingUp, User
 } from 'lucide-react';
 import { auth, signOut } from '@/lib/firebase';
 import {
@@ -23,10 +23,10 @@ const navItems = [
 ];
 
 interface AppSidebarProps {
-  isSyncing?: boolean;
+  userEmail?: string | null;
 }
 
-export function AppSidebar({ isSyncing = false }: AppSidebarProps) {
+export function AppSidebar({ userEmail }: AppSidebarProps) {
   const location = useLocation();
 
   const handleSignOut = async () => {
@@ -67,16 +67,16 @@ export function AppSidebar({ isSyncing = false }: AppSidebarProps) {
       </SidebarContent>
 
       <SidebarFooter className="border-t border-sidebar-border p-4">
-        <div className="flex items-center gap-2 px-2 mb-4">
-          {isSyncing ? (
-            <Cloud className="h-4 w-4 text-blue-500 animate-pulse" />
-          ) : (
-            <CloudOff className="h-4 w-4 text-muted-foreground" />
-          )}
-          <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">
-            {isSyncing ? 'Sincronizzazione...' : 'Dati Salvati'}
-          </span>
-        </div>
+        {userEmail && (
+          <div className="flex items-center gap-3 px-2 mb-4">
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted">
+              <User className="h-4 w-4 text-muted-foreground" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-medium truncate">{userEmail}</p>
+            </div>
+          </div>
+        )}
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton

@@ -17,7 +17,7 @@ interface AppLayoutProps {
   selectedEditionId: string;
   onEditionChange: (id: string) => void;
   onAddEdition: () => void;
-  isSyncing: boolean;
+  userEmail?: string | null;
 }
 
 export function AppLayout({
@@ -25,11 +25,11 @@ export function AppLayout({
   selectedEditionId,
   onEditionChange,
   onAddEdition,
-  isSyncing,
+  userEmail,
 }: AppLayoutProps) {
   return (
     <SidebarProvider>
-      <AppSidebar isSyncing={isSyncing} />
+      <AppSidebar userEmail={userEmail} />
       <SidebarInset>
         <header className="flex h-16 shrink-0 items-center justify-between gap-4 border-b px-4 lg:px-6">
           <div className="flex items-center gap-4">

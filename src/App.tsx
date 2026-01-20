@@ -22,15 +22,17 @@ function LoadingScreen() {
   );
 }
 
-function AuthenticatedApp() {
+interface AuthenticatedAppProps {
+  userEmail?: string | null;
+}
+
+function AuthenticatedApp({ userEmail }: AuthenticatedAppProps) {
   const [selectedEditionId, setSelectedEditionId] = useState<string>('all');
   const [isAddEditionOpen, setIsAddEditionOpen] = useState(false);
 
   const { editions, addEdition, deleteEdition } = useEditions();
-  const { transactions, addTransaction, deleteTransaction, isLoading: txLoading } = useTransactions();
-  const { participants, addParticipant, updateParticipant, deleteParticipant, isLoading: pLoading } = useParticipants();
-
-  const isSyncing = txLoading || pLoading;
+  const { transactions, addTransaction, deleteTransaction } = useTransactions();
+  const { participants, addParticipant, updateParticipant, deleteParticipant } = useParticipants();
 
   const filteredTransactions = useMemo(() => {
     return selectedEditionId === 'all'
@@ -55,7 +57,7 @@ function AuthenticatedApp() {
             selectedEditionId={selectedEditionId}
             onEditionChange={setSelectedEditionId}
             onAddEdition={() => setIsAddEditionOpen(true)}
-            isSyncing={isSyncing}
+            userEmail={userEmail}
           />
         }
       >
@@ -118,7 +120,7 @@ export default function App() {
 
   return (
     <BrowserRouter>
-      {user ? <AuthenticatedApp /> : <AuthPage />}
+      {user ? <AuthenticatedApp userEmail={user.email} /> : <AuthPage />}
     </BrowserRouter>
   );
 }
