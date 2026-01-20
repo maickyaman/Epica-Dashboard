@@ -56,7 +56,6 @@ function AuthenticatedApp({ userEmail }: AuthenticatedAppProps) {
             editions={editions}
             selectedEditionId={selectedEditionId}
             onEditionChange={setSelectedEditionId}
-            onAddEdition={() => setIsAddEditionOpen(true)}
             userEmail={userEmail}
           />
         }

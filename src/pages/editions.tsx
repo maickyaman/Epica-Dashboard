@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Calendar, Trash2 } from 'lucide-react';
+import { Calendar, Trash2, Plus } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -55,6 +55,10 @@ export function EditionsPage({
           <h1 className="text-3xl font-bold tracking-tight">Eventi Registrati</h1>
           <p className="text-muted-foreground">Gestisci le edizioni dell'evento.</p>
         </div>
+        <Button onClick={onOpenDialog}>
+          <Plus className="mr-2 h-4 w-4" />
+          Nuova Edizione
+        </Button>
       </div>
 
       <Dialog open={isDialogOpen} onOpenChange={(open) => !open && onCloseDialog()}>

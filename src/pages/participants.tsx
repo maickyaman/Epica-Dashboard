@@ -27,6 +27,7 @@ const BUS_ROUTES = [
   { value: 'pisogne - ponte di legno', label: 'Pisogne - Ponte di Legno' },
   { value: 'esine - ponte di legno', label: 'Esine - Ponte di Legno' },
   { value: 'rogno - ponte di legno', label: 'Rogno - Ponte di Legno' },
+  { value: 'pisogne - ponte di legno SABATO SERA', label: 'Pisogne - Ponte di Legno (Sabato Sera)' },
   { value: 'pisogne - ponte di legno DOMENICA SERA', label: 'Pisogne - Ponte di Legno (Domenica Sera)' },
   { value: 'nessuna', label: 'Nessuna tratta bus' },
 ] as const;
