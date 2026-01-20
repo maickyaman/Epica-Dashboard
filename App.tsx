@@ -117,6 +117,7 @@ interface ParticipantFormProps {
 interface EditionsViewProps {
   editions: Edition[];
   onAdd: (edition: Edition) => Promise<void>;
+  onDelete: (id: string) => Promise<void>;
 }
 
 interface EditionFormProps {
@@ -363,7 +364,7 @@ const App: React.FC = () => {
           {activeTab === 'dashboard' && <DashboardView stats={stats} transactions={selectedEditionId === 'all' ? transactions : transactions.filter(t => t.editionId === selectedEditionId)} onExport={() => downloadCSV(transactions, 'Report_Epica')} />}
           {activeTab === 'transactions' && <TransactionsView transactions={selectedEditionId === 'all' ? transactions : transactions.filter(t => t.editionId === selectedEditionId)} editions={editions} currentEdition={selectedEditionId} />}
           {activeTab === 'participants' && <ParticipantsView participants={selectedEditionId === 'all' ? participants : participants.filter(p => p.editionId === selectedEditionId)} onEdit={(p) => { setEditingParticipant(p); setIsParticipantModalOpen(true); }} onAdd={() => { setEditingParticipant(null); setIsParticipantModalOpen(true); }} onDelete={async (id) => { if(window.confirm("Eliminare?")) await deleteDoc(doc(db, 'participants', id)); }} />}
-          {activeTab === 'editions' && <EditionsView editions={editions} onAdd={async (e) => await setDoc(doc(db, 'editions', e.id), e)} />}
+          {activeTab === 'editions' && <EditionsView editions={editions} onAdd={async (e) => await setDoc(doc(db, 'editions', e.id), e)} onDelete={async (id) => { if(window.confirm("Eliminare questa edizione?")) await deleteDoc(doc(db, 'editions', id)); }} />}
         </div>
       </main>
 
@@ -526,14 +527,17 @@ const ParticipantForm: React.FC<ParticipantFormProps> = ({ participant, onSave, 
   );
 };
 
-const EditionsView: React.FC<EditionsViewProps> = ({ editions, onAdd }) => (
+const EditionsView: React.FC<EditionsViewProps> = ({ editions, onDelete }) => (
   <div className="space-y-6">
     <h2 className="text-2xl font-bold">Eventi Registrati</h2>
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
       {editions.map(e => (
         <div key={e.id} className="bg-white p-6 rounded-3xl border border-slate-200 flex justify-between items-center group shadow-sm hover:border-green-300 transition-all">
           <div><p className="text-[10px] font-black text-slate-300 uppercase">{e.year}</p><h4 className="font-bold text-xl">{e.name}</h4></div>
-          <div className="w-12 h-12 bg-green-50 text-green-600 rounded-2xl flex items-center justify-center group-hover:bg-green-600 group-hover:text-white transition-all"><Calendar size={24} /></div>
+          <div className="flex items-center gap-2">
+            <button onClick={() => onDelete(e.id)} className="p-2 text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all"><Trash2 size={18} /></button>
+            <div className="w-12 h-12 bg-green-50 text-green-600 rounded-2xl flex items-center justify-center group-hover:bg-green-600 group-hover:text-white transition-all"><Calendar size={24} /></div>
+          </div>
         </div>
       ))}
     </div>
