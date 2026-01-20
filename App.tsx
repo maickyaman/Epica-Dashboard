@@ -14,37 +14,121 @@ import {
   query, orderBy, setDoc 
 } from 'firebase/firestore';
 // Fix: Consolidating firebase/auth imports to a single line to ensure correct member resolution
-import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } from 'firebase/auth';
+import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, User } from 'firebase/auth';
 // Import Google Gemini API
 import { GoogleGenAI } from "@google/genai";
 
-import { 
-  Transaction, TransactionType, SourceType, Participant, Stats, Edition 
+import {
+  Transaction, TransactionType, SourceType, Participant, Stats, Edition
 } from './types';
 import { STAFF_MEMBERS } from './constants';
 
+// --- ENVIRONMENT VARIABLES VALIDATION ---
+const validateEnvVars = () => {
+  const requiredEnvVars = [
+    'VITE_FIREBASE_API_KEY',
+    'VITE_FIREBASE_AUTH_DOMAIN',
+    'VITE_FIREBASE_PROJECT_ID',
+    'VITE_FIREBASE_STORAGE_BUCKET',
+    'VITE_FIREBASE_MESSAGING_SENDER_ID',
+    'VITE_FIREBASE_APP_ID',
+    'VITE_GEMINI_API_KEY'
+  ];
+
+  const missing = requiredEnvVars.filter(varName => !import.meta.env[varName]);
+
+  if (missing.length > 0) {
+    console.error('❌ Missing environment variables:', missing);
+    console.error('📝 Please create a .env file based on .env.example');
+    console.error('🔄 After creating/updating .env, restart the dev server');
+    throw new Error(`Missing required environment variables: ${missing.join(', ')}`);
+  }
+
+  console.log('✅ All environment variables loaded successfully');
+};
+
+// Validate environment variables before initializing Firebase
+validateEnvVars();
+
 // --- CONFIGURAZIONE FIREBASE ---
 const firebaseConfig = {
-  apiKey: "IL_TUO_API_KEY",
-  authDomain: "IL_TUO_PROGETTO.firebaseapp.com",
-  projectId: "IL_TUO_PROGETTO",
-  storageBucket: "IL_TUO_PROGETTO.appspot.com",
-  messagingSenderId: "IL_TUO_SENDER_ID",
-  appId: "IL_TUO_APP_ID"
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID
 };
+
+console.log('🔥 Initializing Firebase with project:', firebaseConfig.projectId);
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
 
 // Initialize Gemini API
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
+
+// --- Component Props Interfaces ---
+interface SidebarItemProps {
+  icon: React.ReactNode;
+  label: string;
+  active: boolean;
+  onClick: () => void;
+}
+
+interface StatCardProps {
+  title: string;
+  value: number;
+  icon: React.ReactNode;
+  color: string;
+  currency?: boolean;
+}
+
+interface AIAssistantProps {
+  stats: Stats;
+}
+
+interface DashboardViewProps {
+  stats: Stats;
+  transactions: Transaction[];
+  onExport: () => void;
+}
+
+interface TransactionsViewProps {
+  transactions: Transaction[];
+  editions: Edition[];
+  currentEdition: string;
+}
+
+interface ParticipantsViewProps {
+  participants: Participant[];
+  onEdit: (participant: Participant) => void;
+  onAdd: () => void;
+  onDelete: (id: string) => void;
+}
+
+interface ParticipantFormProps {
+  participant: Participant | null;
+  onSave: (participant: Participant) => void;
+  editionId: string;
+}
+
+interface EditionsViewProps {
+  editions: Edition[];
+  onAdd: (edition: Edition) => Promise<void>;
+}
+
+interface EditionFormProps {
+  onAdd: (edition: Edition) => void;
+  onCancel: () => void;
+}
 
 // --- Utilities ---
-const downloadCSV = (data: any[], filename: string) => {
+const downloadCSV = (data: Record<string, unknown>[], filename: string) => {
   if (data.length === 0) return;
   const headers = Object.keys(data[0]).join(',');
-  const rows = data.map(obj => 
+  const rows = data.map(obj =>
     Object.values(obj).map(val => `"${String(val).replace(/"/g, '""')}"`).join(',')
   );
   const csvContent = "data:text/csv;charset=utf-8," + [headers, ...rows].join('\n');
@@ -56,15 +140,28 @@ const downloadCSV = (data: any[], filename: string) => {
   document.body.removeChild(link);
 };
 
+// --- Shared Style Constants ---
+const STYLES = {
+  input: "p-3 bg-slate-50 rounded-xl outline-none focus:ring-2 focus:ring-green-500",
+  inputLarge: "w-full p-4 bg-slate-50 rounded-2xl outline-none focus:ring-2 focus:ring-green-500",
+  inputWithBorder: "w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-green-500",
+  button: "px-6 py-3 rounded-2xl font-bold transition-all",
+  buttonPrimary: "bg-green-600 text-white px-6 py-3 rounded-2xl font-bold shadow-lg transition-transform hover:scale-105",
+  buttonSecondary: "bg-slate-900 text-white px-6 py-3 rounded-2xl font-bold",
+  card: "bg-white p-6 rounded-3xl border border-slate-200 shadow-sm",
+  modal: "fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200",
+  modalContent: "bg-white w-full max-w-2xl rounded-3xl shadow-2xl p-8 animate-in zoom-in-95 duration-200 max-h-[90vh] overflow-y-auto"
+} as const;
+
 // --- Componenti UI Riutilizzabili ---
 
-const SidebarItem = ({ icon, label, active, onClick }) => (
+const SidebarItem: React.FC<SidebarItemProps> = ({ icon, label, active, onClick }) => (
   <button onClick={onClick} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${active ? 'bg-green-50 text-green-700 font-bold' : 'text-slate-500 hover:bg-slate-50'}`}>
     {icon} <span>{label}</span>
   </button>
 );
 
-const StatCard = ({ title, value, icon, color, currency = true }) => (
+const StatCard: React.FC<StatCardProps> = ({ title, value, icon, color, currency = true }) => (
   <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex flex-col justify-between">
     <div className={`p-3 w-fit rounded-xl mb-4 ${color}`}>{icon}</div>
     <div>
@@ -75,7 +172,7 @@ const StatCard = ({ title, value, icon, color, currency = true }) => (
 );
 
 // AI Assistant Component
-const AIAssistant = ({ stats }) => {
+const AIAssistant: React.FC<AIAssistantProps> = ({ stats }) => {
   const [analysis, setAnalysis] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -127,7 +224,7 @@ const AIAssistant = ({ stats }) => {
 // --- Main App Component ---
 
 const App: React.FC = () => {
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<User | null>(null);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'dashboard' | 'transactions' | 'participants' | 'editions' | 'settings'>('dashboard');
   
@@ -284,7 +381,7 @@ const App: React.FC = () => {
 
 // --- View Components ---
 
-const DashboardView = ({ stats, transactions, onExport }) => {
+const DashboardView: React.FC<DashboardViewProps> = ({ stats, transactions, onExport }) => {
   const chartData = [
     { name: 'Entrate', val: stats.totalIncome, fill: '#059669' },
     { name: 'Uscite', val: stats.totalExpense, fill: '#e11d48' }
@@ -297,7 +394,7 @@ const DashboardView = ({ stats, transactions, onExport }) => {
           <h2 className="text-3xl font-bold">Panoramica</h2>
           <p className="text-slate-400 text-sm">Resoconto finanziario e logistico.</p>
         </div>
-        <button onClick={onExport} className="bg-slate-900 text-white px-6 py-3 rounded-2xl font-bold text-sm flex items-center gap-2"><FileSpreadsheet size={18} /> Esporta</button>
+        <button onClick={onExport} className={`${STYLES.buttonSecondary} text-sm flex items-center gap-2`}><FileSpreadsheet size={18} /> Esporta</button>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
         <StatCard title="Tot. Entrate" value={stats.totalIncome} icon={<TrendingUp size={24} />} color="bg-green-50 text-green-600" />
@@ -327,7 +424,7 @@ const DashboardView = ({ stats, transactions, onExport }) => {
   );
 };
 
-const TransactionsView = ({ transactions, editions, currentEdition }) => {
+const TransactionsView: React.FC<TransactionsViewProps> = ({ transactions, editions, currentEdition }) => {
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ description: '', amount: '', type: TransactionType.INCOME, date: new Date().toISOString().split('T')[0], editionId: currentEdition === 'all' ? (editions[0]?.id || '') : currentEdition });
 
@@ -343,17 +440,17 @@ const TransactionsView = ({ transactions, editions, currentEdition }) => {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold">Registro Movimenti</h2>
-        <button onClick={() => setShowForm(!showForm)} className="bg-green-600 text-white px-6 py-3 rounded-2xl font-bold shadow-lg transition-transform hover:scale-105">+ Movimento</button>
+        <button onClick={() => setShowForm(!showForm)} className={STYLES.buttonPrimary}>+ Movimento</button>
       </div>
       {showForm && (
-        <form onSubmit={add} className="bg-white p-6 rounded-3xl border border-slate-200 grid grid-cols-1 md:grid-cols-4 gap-4 animate-in slide-in-from-top-4">
-          <input type="text" placeholder="Descrizione" value={form.description} onChange={e => setForm({...form, description: e.target.value})} className="p-3 bg-slate-50 rounded-xl outline-none focus:ring-2 focus:ring-green-500" />
-          <input type="number" step="0.01" placeholder="Importo" value={form.amount} onChange={e => setForm({...form, amount: e.target.value})} className="p-3 bg-slate-50 rounded-xl outline-none focus:ring-2 focus:ring-green-500 font-bold" />
-          <select value={form.type} onChange={e => setForm({...form, type: e.target.value as TransactionType})} className="p-3 bg-slate-50 rounded-xl outline-none focus:ring-2 focus:ring-green-500">
+        <form onSubmit={add} className={`${STYLES.card} grid grid-cols-1 md:grid-cols-4 gap-4 animate-in slide-in-from-top-4`}>
+          <input type="text" placeholder="Descrizione" value={form.description} onChange={e => setForm({...form, description: e.target.value})} className={STYLES.input} />
+          <input type="number" step="0.01" placeholder="Importo" value={form.amount} onChange={e => setForm({...form, amount: e.target.value})} className={`${STYLES.input} font-bold`} />
+          <select value={form.type} onChange={e => setForm({...form, type: e.target.value as TransactionType})} className={STYLES.input}>
              <option value={TransactionType.INCOME}>Entrata</option>
              <option value={TransactionType.EXPENSE}>Uscita</option>
           </select>
-          <button type="submit" className="bg-slate-900 text-white font-bold rounded-xl">Salva</button>
+          <button type="submit" className={`${STYLES.buttonSecondary} rounded-xl`}>Salva</button>
         </form>
       )}
       <div className="bg-white rounded-3xl border border-slate-200 overflow-hidden shadow-sm">
@@ -381,11 +478,11 @@ const TransactionsView = ({ transactions, editions, currentEdition }) => {
   );
 };
 
-const ParticipantsView = ({ participants, onEdit, onAdd, onDelete }) => (
+const ParticipantsView: React.FC<ParticipantsViewProps> = ({ participants, onEdit, onAdd, onDelete }) => (
   <div className="space-y-6">
     <div className="flex justify-between items-center">
       <h2 className="text-2xl font-bold">Anagrafica Iscritti</h2>
-      <button onClick={onAdd} className="bg-green-600 text-white px-6 py-3 rounded-2xl font-bold shadow-lg transition-transform hover:scale-105">+ Iscritto</button>
+      <button onClick={onAdd} className={STYLES.buttonPrimary}>+ Iscritto</button>
     </div>
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
       {participants.map(p => (
@@ -411,25 +508,25 @@ const ParticipantsView = ({ participants, onEdit, onAdd, onDelete }) => (
   </div>
 );
 
-const ParticipantForm = ({ participant, onSave, editionId }) => {
+const ParticipantForm: React.FC<ParticipantFormProps> = ({ participant, onSave, editionId }) => {
   const [form, setForm] = useState(participant || { nome: '', cognome: '', citta: '', cellulare: '', taglia: 'M', tappaPullman: 'pisogne - ponte di legno', pranzo: false, notteHotel: false, ebike: false, pagato: 0, note: '', id: 'new-' + Date.now() });
   
   return (
     <form onSubmit={(e) => { e.preventDefault(); onSave({...form, editionId}); }} className="grid grid-cols-2 gap-4">
-      <div className="space-y-1"><label className="text-[10px] font-bold text-slate-400 uppercase">Nome</label><input required value={form.nome} onChange={e => setForm({...form, nome: e.target.value})} className="w-full p-3 bg-slate-50 rounded-xl outline-none" /></div>
-      <div className="space-y-1"><label className="text-[10px] font-bold text-slate-400 uppercase">Cognome</label><input required value={form.cognome} onChange={e => setForm({...form, cognome: e.target.value})} className="w-full p-3 bg-slate-50 rounded-xl outline-none" /></div>
+      <div className="space-y-1"><label className="text-[10px] font-bold text-slate-400 uppercase">Nome</label><input required value={form.nome} onChange={e => setForm({...form, nome: e.target.value})} className={`w-full ${STYLES.input}`} /></div>
+      <div className="space-y-1"><label className="text-[10px] font-bold text-slate-400 uppercase">Cognome</label><input required value={form.cognome} onChange={e => setForm({...form, cognome: e.target.value})} className={`w-full ${STYLES.input}`} /></div>
       <div className="col-span-2 flex gap-4 py-4 border-y border-slate-50 my-2">
         <label className="flex items-center gap-2 text-xs font-bold cursor-pointer"><input type="checkbox" checked={form.ebike} onChange={e => setForm({...form, ebike: e.target.checked})} className="w-4 h-4 accent-yellow-500" /> E-BIKE</label>
         <label className="flex items-center gap-2 text-xs font-bold cursor-pointer"><input type="checkbox" checked={form.pranzo} onChange={e => setForm({...form, pranzo: e.target.checked})} className="w-4 h-4 accent-green-600" /> PRANZO</label>
         <label className="flex items-center gap-2 text-xs font-bold cursor-pointer"><input type="checkbox" checked={form.notteHotel} onChange={e => setForm({...form, notteHotel: e.target.checked})} className="w-4 h-4 accent-purple-600" /> HOTEL</label>
       </div>
-      <div className="col-span-2 space-y-1"><label className="text-[10px] font-bold text-slate-400 uppercase">Importo Pagato (€)</label><input type="number" step="0.01" value={form.pagato} onChange={e => setForm({...form, pagato: parseFloat(e.target.value)})} className="w-full p-3 bg-slate-50 rounded-xl font-bold" /></div>
-      <button type="submit" className="col-span-2 bg-slate-900 text-white p-4 rounded-2xl font-bold shadow-lg transition-transform hover:scale-[1.02] mt-4">Salva nel Cloud</button>
+      <div className="col-span-2 space-y-1"><label className="text-[10px] font-bold text-slate-400 uppercase">Importo Pagato (€)</label><input type="number" step="0.01" value={form.pagato} onChange={e => setForm({...form, pagato: parseFloat(e.target.value)})} className={`w-full ${STYLES.input} font-bold`} /></div>
+      <button type="submit" className={`col-span-2 ${STYLES.buttonSecondary} shadow-lg transition-transform hover:scale-[1.02] mt-4`}>Salva nel Cloud</button>
     </form>
   );
 };
 
-const EditionsView = ({ editions, onAdd }) => (
+const EditionsView: React.FC<EditionsViewProps> = ({ editions, onAdd }) => (
   <div className="space-y-6">
     <h2 className="text-2xl font-bold">Eventi Registrati</h2>
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -443,16 +540,16 @@ const EditionsView = ({ editions, onAdd }) => (
   </div>
 );
 
-const EditionForm = ({ onAdd, onCancel }) => {
+const EditionForm: React.FC<EditionFormProps> = ({ onAdd, onCancel }) => {
   const [year, setYear] = useState('');
   const [name, setName] = useState('');
   return (
     <div className="space-y-4">
-      <input placeholder="Anno (es: 2026)" value={year} onChange={e => setYear(e.target.value)} className="w-full p-4 bg-slate-50 rounded-2xl outline-none focus:ring-2 focus:ring-green-500" />
-      <input placeholder="Nome Edizione" value={name} onChange={e => setName(e.target.value)} className="w-full p-4 bg-slate-50 rounded-2xl outline-none focus:ring-2 focus:ring-green-500" />
+      <input placeholder="Anno (es: 2026)" value={year} onChange={e => setYear(e.target.value)} className={STYLES.inputLarge} />
+      <input placeholder="Nome Edizione" value={name} onChange={e => setName(e.target.value)} className={STYLES.inputLarge} />
       <div className="flex gap-2">
         <button onClick={onCancel} className="flex-1 p-4 text-slate-400 font-bold">Annulla</button>
-        <button onClick={() => onAdd({id: year, year, name})} className="flex-1 bg-slate-900 text-white p-4 rounded-2xl font-bold shadow-lg">Crea</button>
+        <button onClick={() => onAdd({id: year, year, name})} className={`flex-1 ${STYLES.buttonSecondary} shadow-lg`}>Crea</button>
       </div>
     </div>
   );
@@ -470,10 +567,40 @@ const AuthView = () => {
     setError('');
     setIsLoading(true);
     try {
-      if (isLogin) await signInWithEmailAndPassword(auth, email, password);
-      else await createUserWithEmailAndPassword(auth, email, password);
-    } catch (err: any) {
-      setError('Errore: ' + err.message);
+      console.log('🔐 Attempting authentication...');
+      if (isLogin) {
+        await signInWithEmailAndPassword(auth, email, password);
+        console.log('✅ Login successful');
+      } else {
+        await createUserWithEmailAndPassword(auth, email, password);
+        console.log('✅ Registration successful');
+      }
+    } catch (err: unknown) {
+      console.error('❌ Authentication error:', err);
+      let errorMessage = 'Errore sconosciuto';
+
+      if (err instanceof Error) {
+        // Provide user-friendly error messages
+        if (err.message.includes('auth/invalid-email')) {
+          errorMessage = 'Email non valida';
+        } else if (err.message.includes('auth/user-not-found')) {
+          errorMessage = 'Utente non trovato';
+        } else if (err.message.includes('auth/wrong-password')) {
+          errorMessage = 'Password errata';
+        } else if (err.message.includes('auth/invalid-credential')) {
+          errorMessage = 'Credenziali non valide';
+        } else if (err.message.includes('auth/email-already-in-use')) {
+          errorMessage = 'Email già in uso';
+        } else if (err.message.includes('auth/weak-password')) {
+          errorMessage = 'Password troppo debole (minimo 6 caratteri)';
+        } else if (err.message.includes('auth/configuration-not-found') || err.message.includes('auth/invalid-api-key')) {
+          errorMessage = 'Errore di configurazione Firebase. Verificare le credenziali in .env';
+        } else {
+          errorMessage = err.message;
+        }
+      }
+
+      setError(errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -488,8 +615,8 @@ const AuthView = () => {
           <p className="text-slate-400 text-sm mt-2">Accedi alla piattaforma protetta dell'evento.</p>
         </div>
         <form onSubmit={handleAuth} className="space-y-4">
-          <input type="email" placeholder="Email" value={email} onChange={e => setEmail(e.target.value)} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-green-500" required />
-          <input type="password" placeholder="Password" value={password} onChange={e => setPassword(e.target.value)} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-green-500" required />
+          <input type="email" placeholder="Email" value={email} onChange={e => setEmail(e.target.value)} className={STYLES.inputWithBorder} required />
+          <input type="password" placeholder="Password" value={password} onChange={e => setPassword(e.target.value)} className={STYLES.inputWithBorder} required />
           {error && <div className="p-4 bg-red-50 text-red-600 rounded-xl text-xs font-bold border border-red-100 flex items-center gap-2"><AlertCircle size={14}/> {error}</div>}
           <button type="submit" disabled={isLoading} className="w-full py-4 bg-green-600 text-white font-bold rounded-2xl shadow-xl hover:bg-green-700 transition-all flex items-center justify-center">
             {isLoading ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> : (isLogin ? 'Accedi' : 'Registrati')}
