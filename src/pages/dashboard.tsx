@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import Markdown from 'react-markdown';
 import {
   TrendingUp, TrendingDown, Wallet, Users, Zap, FileSpreadsheet
 } from 'lucide-react';
@@ -84,8 +85,8 @@ function AIAssistant({ stats }: AIAssistantProps) {
       </CardHeader>
       <CardContent className="space-y-4">
         {analysis ? (
-          <div className="rounded-xl bg-white/10 p-4 backdrop-blur-sm text-sm leading-relaxed">
-            {analysis}
+          <div className="rounded-xl bg-white/10 p-4 backdrop-blur-sm text-sm leading-relaxed prose prose-invert prose-sm max-w-none prose-p:my-2 prose-ul:my-2 prose-li:my-0 prose-headings:text-white prose-strong:text-white">
+            <Markdown>{analysis}</Markdown>
           </div>
         ) : (
           <CardDescription className="text-white/70">

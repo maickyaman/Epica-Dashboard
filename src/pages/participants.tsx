@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Plus, Edit2, Trash2, Zap } from 'lucide-react';
+import { Plus, Edit2, Trash2, Zap, Bus } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,7 +14,22 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import type { Participant, Edition } from '@/types';
+
+const BUS_ROUTES = [
+  { value: 'pisogne - ponte di legno', label: 'Pisogne - Ponte di Legno' },
+  { value: 'esine - ponte di legno', label: 'Esine - Ponte di Legno' },
+  { value: 'rogno - ponte di legno', label: 'Rogno - Ponte di Legno' },
+  { value: 'pisogne - ponte di legno DOMENICA SERA', label: 'Pisogne - Ponte di Legno (Domenica Sera)' },
+  { value: 'nessuna', label: 'Nessuna tratta bus' },
+] as const;
 
 interface ParticipantFormData {
   nome: string;
@@ -36,7 +51,7 @@ const defaultFormData: ParticipantFormData = {
   citta: '',
   cellulare: '',
   taglia: 'M',
-  tappaPullman: 'pisogne - ponte di legno',
+  tappaPullman: 'nessuna',
   pranzo: false,
   notteHotel: false,
   ebike: false,
@@ -201,6 +216,25 @@ export function ParticipantsPage({
               </div>
 
               <div className="space-y-2">
+                <Label htmlFor="tappaPullman">Tratta Bus</Label>
+                <Select
+                  value={form.tappaPullman}
+                  onValueChange={(value) => setForm({ ...form, tappaPullman: value })}
+                >
+                  <SelectTrigger id="tappaPullman">
+                    <SelectValue placeholder="Seleziona tratta bus" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {BUS_ROUTES.map((route) => (
+                      <SelectItem key={route.value} value={route.value}>
+                        {route.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
                 <Label htmlFor="pagato">Importo Pagato (€)</Label>
                 <Input
                   id="pagato"
@@ -282,6 +316,12 @@ export function ParticipantsPage({
                   {p.notteHotel && (
                     <Badge variant="secondary" className="bg-purple-100 text-purple-700 hover:bg-purple-100">
                       HOTEL
+                    </Badge>
+                  )}
+                  {p.tappaPullman && p.tappaPullman !== 'nessuna' && (
+                    <Badge variant="secondary" className="bg-blue-100 text-blue-700 hover:bg-blue-100">
+                      <Bus className="mr-1 h-3 w-3" />
+                      {BUS_ROUTES.find(r => r.value === p.tappaPullman)?.label || p.tappaPullman}
                     </Badge>
                   )}
                 </div>
