@@ -1,4 +1,3 @@
-
 export enum TransactionType {
   INCOME = 'ENTRATA',
   EXPENSE = 'USCITA'
@@ -51,4 +50,5 @@ export interface Stats {
   enduIncome: number;
   cashIncome: number;
   totalEbikes: number;
+  participantsCount: number;
 }
